@@ -2,7 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { query } from './db.js';
+import { checkDatabase } from './models/healthModel.js';
 
 // Importar rutas
 import authRoutes from './routes/authRoutes.js';
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
 // Ruta de salud del servidor
 app.get('/api/health', async (req, res) => {
   try {
-    await query('SELECT 1');
+    await checkDatabase();
     res.json({ status: 'OK', database: 'connected', timestamp: new Date().toISOString() });
   } catch {
     res.status(503).json({ status: 'ERROR', database: 'disconnected', timestamp: new Date().toISOString() });
@@ -77,7 +77,7 @@ app.use(errorHandler);
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================
-app.listen(PORT, () => {
+export const httpServer = app.listen(PORT, () => {
   console.log('');
   console.log('🎓 ============================================');
   console.log('   ULimaSocial - Backend iniciado');
