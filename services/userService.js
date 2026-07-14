@@ -66,15 +66,34 @@ export const removeUnverifiedUser = async (userId) => {
 };
 
 export const verifyUserAccount = async (email, code) => {
+  const normalizedEmail = normalizeEmail(email);
+  const codeHash = hashOneTimeCode(code);
   const result = await query(
     `UPDATE users
      SET verified = TRUE, verification_code_hash = NULL, verification_expires_at = NULL
      WHERE email = $1 AND verified = FALSE
        AND verification_code_hash = $2 AND verification_expires_at > NOW()
      RETURNING ${PUBLIC_USER_COLUMNS}`,
-    [normalizeEmail(email), hashOneTimeCode(code)]
+    [normalizedEmail, codeHash]
   );
-  if (!result.rowCount) throw Object.assign(new Error('Código incorrecto o vencido'), { status: 400 });
+  if (!result.rowCount) {
+    const diagnostic = await query(
+      `SELECT verified,
+              verification_code_hash = $2 AS "codeMatches",
+              verification_expires_at > NOW() AS "codeActive"
+       FROM users WHERE email = $1 LIMIT 1`,
+      [normalizedEmail, codeHash]
+    );
+    const state = diagnostic.rows[0];
+    console.warn('[VERIFY] Verificación rechazada', {
+      email: normalizedEmail,
+      userFound: Boolean(state),
+      alreadyVerified: state?.verified ?? false,
+      codeMatches: state?.codeMatches ?? false,
+      codeActive: state?.codeActive ?? false,
+    });
+    throw Object.assign(new Error('Código incorrecto o vencido'), { status: 400 });
+  }
   return result.rows[0];
 };
 
